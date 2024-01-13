@@ -1,61 +1,81 @@
-use bevy::prelude::*;
+//! Loads and renders a glTF file as a scene.
 
-pub const PLAYER_MOVEMENT_SPEED: f32 = 200.;
+use bevy::{
+    pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
+    prelude::*,
+};
+use std::f32::consts::*;
 
-#[derive(Component)]
-struct Player;
+#[derive(Resource)]
+pub struct WalkerAnimation(pub Handle<AnimationClip>);
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(
-            // Comment this if you're not using pixel art.
-            // This sets image filtering to nearest
-            // This is done to prevent textures with low resolution (e.g. pixel art) from being blurred
-            // by linear filtering.
-            ImagePlugin::default_nearest(),
-        ))
-        .add_systems(Startup, (spawn_2d_camera, spawn_player))
-        .add_systems(Update, move_player)
+        .insert_resource(DirectionalLightShadowMap { size: 4096 })
+        .add_plugins(DefaultPlugins)
+        .add_systems(Startup, setup)
+        .add_systems(Update, (animate_light_direction, animate_walker))
         .run();
 }
 
-fn spawn_2d_camera(mut commands: Commands) {
-    commands.spawn(Camera2dBundle { ..default() });
-}
+fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+    commands.insert_resource(WalkerAnimation(
+        asset_server.load("models/walker/walker.gltf#Animation0"),
+    ));
 
-fn spawn_player(mut commands: Commands, asset_server: Res<AssetServer>) {
-    commands.spawn((
-        SpriteBundle {
-            texture: asset_server.load("art/ball.png"),
+    commands.spawn((Camera3dBundle {
+        transform: Transform::from_xyz(20., 12., -25.0).looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
+        ..default()
+    },));
+
+    commands.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            shadows_enabled: true,
             ..default()
         },
-        Player,
-    ));
+        // This is a relatively small scene, so use tighter shadow
+        // cascade bounds than the default for better quality.
+        // We also adjusted the shadow map to be larger since we're
+        // only using a single cascade.
+        cascade_shadow_config: CascadeShadowConfigBuilder {
+            num_cascades: 1,
+            maximum_distance: 1.6,
+            ..default()
+        }
+        .into(),
+        ..default()
+    });
+
+    commands.spawn(SceneBundle {
+        scene: asset_server.load("models/xwing/xwing.gltf#Scene0"),
+        ..default()
+    });
+
+    commands.spawn(SceneBundle {
+        scene: asset_server.load("models/walker/walker.gltf#Scene0"),
+        ..default()
+    });
 }
 
-/// Handles the player movement each frame by updating it's **transform** component.
-fn move_player(
-    mut player_query: Query<&mut Transform, With<Player>>,
-    keyboard_input: Res<Input<KeyCode>>,
+fn animate_light_direction(
     time: Res<Time>,
+    mut query: Query<&mut Transform, With<DirectionalLight>>,
 ) {
-    if let Ok(mut player_transform) = player_query.get_single_mut() {
-        let mut direction = Vec3::ZERO;
+    for mut transform in &mut query {
+        transform.rotation = Quat::from_euler(
+            EulerRot::ZYX,
+            0.0,
+            time.elapsed_seconds() * PI / 5.0,
+            -FRAC_PI_4,
+        );
+    }
+}
 
-        if keyboard_input.pressed(KeyCode::A) {
-            direction.x -= 1.;
-        }
-        if keyboard_input.pressed(KeyCode::D) {
-            direction.x += 1.;
-        }
-        if keyboard_input.pressed(KeyCode::W) {
-            direction.y += 1.;
-        }
-        if keyboard_input.pressed(KeyCode::S) {
-            direction.y -= 1.;
-        }
-
-        let direction = direction.normalize_or_zero();
-        player_transform.translation += direction * PLAYER_MOVEMENT_SPEED * time.delta_seconds();
+pub fn animate_walker(
+    walker_animation: Res<WalkerAnimation>,
+    mut walker_animation_players: Query<&mut AnimationPlayer, Added<AnimationPlayer>>,
+) {
+    for mut animation_player in walker_animation_players.iter_mut() {
+        animation_player.play(walker_animation.0.clone_weak());
     }
 }

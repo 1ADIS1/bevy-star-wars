@@ -18,4 +18,4 @@ opt-level = 3
 bevy = { version = "0.12", features = ["dynamic_linking"] }
 rand = "0.8.5"
 # parry2d = "0.13.5"
-# bevy = "0.11.2"
+# bevy = "0.12"
