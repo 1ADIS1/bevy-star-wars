@@ -6,10 +6,13 @@ use bevy::{
     prelude::*,
 };
 use bevy_inspector_egui::quick::AssetInspectorPlugin;
-use landscape::{LandscapeMaterial, LandscapePlugin};
+use landscape::{LandscapeMaterial, LandscapePlugin, MoveWithLandscape};
 use std::f32::consts::*;
 
 const CAMERA_ROTATION_SPEED: f32 = 0.3;
+
+/// measured in seconds
+const WALKER_SPAWN_INTERVAL: f32 = 2.0;
 
 #[derive(Resource)]
 pub struct WalkerAnimation(pub Handle<AnimationClip>);
@@ -35,7 +38,12 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(
             Update,
-            (animate_light_direction, animate_walker, handle_camera_input),
+            (
+                animate_light_direction,
+                animate_walker,
+                handle_camera_input,
+                spawn_walkers,
+            ),
         )
         .run();
 }
@@ -69,12 +77,28 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         scene: asset_server.load("models/xwing/xwing.gltf#Scene0"),
         ..default()
     });
+}
 
-    commands.spawn(SceneBundle {
-        scene: asset_server.load("models/walker/walker.gltf#Scene0"),
-        transform: Transform::from_xyz(-30., -20., 0.),
-        ..default()
-    });
+fn spawn_walkers(
+    mut commands: Commands,
+    mut timer: Local<f32>,
+    time: Res<Time>,
+    asset_server: Res<AssetServer>,
+) {
+    *timer -= time.delta_seconds();
+    if *timer >= 0. {
+        return;
+    }
+    *timer += WALKER_SPAWN_INTERVAL;
+
+    commands.spawn((
+        MoveWithLandscape {},
+        SceneBundle {
+            scene: asset_server.load("models/walker/walker.gltf#Scene0"),
+            transform: Transform::from_xyz(-30., -20., 0.),
+            ..default()
+        },
+    ));
 }
 
 fn animate_light_direction(
