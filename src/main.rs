@@ -1,14 +1,15 @@
-//! Loads and renders a glTF file as a scene.
+mod landscape;
 
 use bevy::{
-    input::mouse::MouseMotion,
-    pbr::{CascadeShadowConfigBuilder, DirectionalLightShadowMap},
+    input::mouse::{MouseMotion, MouseWheel},
+    pbr::DirectionalLightShadowMap,
     prelude::*,
 };
+use bevy_inspector_egui::quick::AssetInspectorPlugin;
+use landscape::{LandscapeMaterial, LandscapePlugin};
 use std::f32::consts::*;
 
 const CAMERA_ROTATION_SPEED: f32 = 0.3;
-const CAMERA_OFFSET: f32 = 20.;
 
 #[derive(Resource)]
 pub struct WalkerAnimation(pub Handle<AnimationClip>);
@@ -16,12 +17,21 @@ pub struct WalkerAnimation(pub Handle<AnimationClip>);
 #[derive(Component)]
 pub struct CameraController {
     pub rotation: Quat,
+    pub zoom: f32,
 }
 
 fn main() {
     App::new()
+        .insert_resource(AmbientLight {
+            color: Color::WHITE,
+            brightness: 1.0 / 5.0f32,
+        })
         .insert_resource(DirectionalLightShadowMap { size: 4096 })
-        .add_plugins(DefaultPlugins)
+        .add_plugins((
+            DefaultPlugins,
+            LandscapePlugin,
+            AssetInspectorPlugin::<LandscapeMaterial>::default(),
+        ))
         .add_systems(Startup, setup)
         .add_systems(
             Update,
@@ -38,29 +48,20 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     commands.spawn((
         CameraController {
             rotation: Quat::IDENTITY,
+            zoom: 45.,
         },
         Camera3dBundle {
-            transform: Transform::from_xyz(20., 12., -25.0)
-                .looking_at(Vec3::new(0., 0., 0.), Vec3::Y),
+            transform: Transform::from_xyz(0.7, 20., 40.0)
+                .looking_at(Vec3::new(0., 0.3, 0.), Vec3::Y),
             ..default()
         },
     ));
 
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            shadows_enabled: true,
+            shadows_enabled: false, // TODO: set to true on release
             ..default()
         },
-        // This is a relatively small scene, so use tighter shadow
-        // cascade bounds than the default for better quality.
-        // We also adjusted the shadow map to be larger since we're
-        // only using a single cascade.
-        cascade_shadow_config: CascadeShadowConfigBuilder {
-            num_cascades: 1,
-            maximum_distance: 1.6,
-            ..default()
-        }
-        .into(),
         ..default()
     });
 
@@ -71,6 +72,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn(SceneBundle {
         scene: asset_server.load("models/walker/walker.gltf#Scene0"),
+        transform: Transform::from_xyz(-30., -20., 0.),
         ..default()
     });
 }
@@ -103,14 +105,23 @@ pub fn animate_walker(
 pub fn handle_camera_input(
     mut mouse_motion: EventReader<MouseMotion>,
     mut camera_controller: Query<(&mut Transform, &mut CameraController)>,
+    mouse_buttons: Res<Input<MouseButton>>,
+    mut mouse_wheel: EventReader<MouseWheel>,
     time: Res<Time>,
 ) {
     for (mut cam_transform, mut cam_controller) in camera_controller.iter_mut() {
-        for motion in mouse_motion.read() {
-            let delta = motion.delta * time.delta_seconds() * CAMERA_ROTATION_SPEED;
-            cam_controller.rotation *= Quat::from_euler(EulerRot::XYZ, -delta.x, -delta.y, 0.);
+        for wheel in mouse_wheel.read() {
+            cam_controller.zoom += wheel.y;
         }
-        cam_transform.translation = cam_controller.rotation * Vec3::Z * CAMERA_OFFSET;
+
+        if mouse_buttons.pressed(MouseButton::Right) {
+            for motion in mouse_motion.read() {
+                let delta = motion.delta * time.delta_seconds() * CAMERA_ROTATION_SPEED;
+                cam_controller.rotation *= Quat::from_euler(EulerRot::XYZ, -delta.x, -delta.y, 0.);
+            }
+        }
+
+        cam_transform.translation = cam_controller.rotation * Vec3::Z * cam_controller.zoom;
         cam_transform.look_at(Vec3::ZERO, Vec3::Y);
     }
 }
