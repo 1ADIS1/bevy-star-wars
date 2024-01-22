@@ -6,13 +6,15 @@ use bevy::{
     prelude::*,
 };
 use bevy_inspector_egui::quick::AssetInspectorPlugin;
-use landscape::{LandscapeMaterial, LandscapePlugin, MoveWithLandscape};
+use landscape::*;
+use rand::Rng;
 use std::f32::consts::*;
 
 const CAMERA_ROTATION_SPEED: f32 = 0.3;
 
 /// measured in seconds
 const WALKER_SPAWN_INTERVAL: f32 = 2.0;
+const X_FAR_SPAWN: f32 = 400.;
 
 #[derive(Resource)]
 pub struct WalkerAnimation(pub Handle<AnimationClip>);
@@ -67,7 +69,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
 
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            shadows_enabled: false, // TODO: set to true on release
+            shadows_enabled: true, // TODO: set to true on release
             ..default()
         },
         ..default()
@@ -77,6 +79,18 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         scene: asset_server.load("models/xwing/xwing.gltf#Scene0"),
         ..default()
     });
+}
+
+fn randomise_position(x_close_spawn: f32) -> Transform {
+    let mut rng = rand::thread_rng();
+    let flip = (rng.gen_range(0..=1) * 2 - 1) as f32;
+
+    Transform::from_xyz(
+        rng.gen_range(x_close_spawn..X_FAR_SPAWN) * flip,
+        -20.,
+        -LANDSCAPE_SIZE_HALF,
+    )
+    .with_rotation(Quat::from_rotation_y(rng.gen_range(0.0..PI * 2.)))
 }
 
 fn spawn_walkers(
@@ -95,7 +109,7 @@ fn spawn_walkers(
         MoveWithLandscape {},
         SceneBundle {
             scene: asset_server.load("models/walker/walker.gltf#Scene0"),
-            transform: Transform::from_xyz(-30., -20., 0.),
+            transform: randomise_position(-36.),
             ..default()
         },
     ));

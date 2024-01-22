@@ -6,8 +6,8 @@ use bevy::{
     },
 };
 
-const LANDSCAPE_SIZE: f32 = 1200.;
-const LANDSCAPE_SIZE_HALF: f32 = LANDSCAPE_SIZE / 2.;
+pub const LANDSCAPE_SIZE: f32 = 1200.;
+pub const LANDSCAPE_SIZE_HALF: f32 = LANDSCAPE_SIZE / 2.;
 
 #[derive(Component)]
 pub struct MoveWithLandscape;
@@ -78,7 +78,7 @@ fn set_textures_repeating(
     for event in texture_events.read() {
         match event {
             AssetEvent::Added { id } => {
-                let texture = textures.get_mut(*id).unwrap();
+                let texture = textures.get_mut(*id).expect("Couldn't find the texture!");
                 texture.sampler = ImageSampler::Descriptor(ImageSamplerDescriptor {
                     address_mode_u: AddressMode::Repeat.into(),
                     address_mode_v: AddressMode::Repeat.into(),

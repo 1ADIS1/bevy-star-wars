@@ -17,3 +17,4 @@ opt-level = 3
 # Remove this on release
 bevy = { version = "0.12", features = ["dynamic_linking"] }
 bevy-inspector-egui = "0.22.1"
+rand = "0.8.5"
