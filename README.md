@@ -2,4 +2,4 @@
 
 ### Source code and assets: [TanTan's GitHub](https://github.com/TanTanDev/not_star_wars).
 
-### TODO: screenshot
+![Alt text](image.png)
